@@ -47,13 +47,13 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    // 🚀 FIXED: Maps precisely to your 'account_id' column inside your Supabase table
+    // 🚀 FIXED: Maps precisely to your 'login_id' column inside your Supabase table schema
     const { error } = await supabase
       .from("broker_accounts")
       .upsert({
         platform: platform || "MT5",
         broker_name: formattedServer,
-        account_id: String(loginId).trim(), // 🔀 Changed from account_number to account_id
+        login_id: String(loginId).trim(), // 🔀 Changed to login_id
         password: investorPassword.trim(),
         id: localTerminalInstanceId, 
         updated_at: new Date().toISOString()
