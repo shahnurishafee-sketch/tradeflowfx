@@ -1,6 +1,7 @@
 // app/api/trading-connection/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,9 @@ export async function POST(request: Request) {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const formattedServer = brokerServer.trim();
     console.log(`🤖 Initiating standard MT4/MT5 bridge handshake matrix for Login ID: ${loginId}...`);
-    // Generate an internal cryptographic registration profile node hash mapping parameters
-    const localTerminalInstanceId = `client_node_${Buffer.from(loginId).toString("hex").slice(0, 12)}`;
+    
+    // 🚀 FIXED: Generates a perfectly structured 36-character UUID string required by your Supabase schema
+    const localTerminalInstanceId = crypto.randomUUID();
     
     let terminalConnected = false;
     try {
@@ -47,18 +49,17 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    // 🚀 FIXED: Maps precisely to your exact Supabase database table column properties
+    // Commit account registration rows down to your Supabase cloud broker_accounts table rows
     const { error } = await supabase
       .from("broker_accounts")
       .upsert({
         platform: platform || "MT5",
-        broker_server: formattedServer, // 🔀 Changed to broker_server
+        broker_server: formattedServer,
         login_id: String(loginId).trim(),
-        investor_password: investorPassword.trim(), // 🔀 Changed to investor_password
-        id: localTerminalInstanceId, 
+        investor_password: investorPassword.trim(),
+        id: localTerminalInstanceId, // Now accurately passes a UUID item to prevent syntax crashes
         updated_at: new Date().toISOString()
       }, { onConflict: "id" });
-
 
     if (error) {
       console.error("Supabase Matrix Update Blocked by Row Policy Rules:", error.message);
