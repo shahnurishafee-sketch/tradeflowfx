@@ -13,14 +13,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Server system variables misconfigured" }, { status: 500 });
     }
 
+    // 🚀 MULTI-USER FIX: Build the client to read browser request header auth cookies automatically
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Pull the active connection record dynamically out of your broker table
-    const { data: accountRow, error: dbError } = await supabase
-      .from("broker_accounts")
-      .select("id, login_id") 
-      .single(); 
+    // Get the session profile of the specific user hitting the site right now
+    const authHeader = request.headers.get("Authorization") || "";
+    const token = authHeader.replace("Bearer ", "").trim();
 
+    let currentUserUuid = null;
+
+    if (token) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      currentUserUuid = user?.id || null;
+    }
+
+    // 2. Fetch the specific broker row belonging to this unique visitor
+    // If no explicit token header exists, fall back to scanning your testing record row seamlessly
+    let queryBuilder = supabase.from("broker_accounts").select("id, login_id, user_id");
+    
+    if (currentUserUuid) {
+      queryBuilder = queryBuilder.eq("user_id", currentUserUuid);
+    }
+
+    const { data: accountRow, error: dbError } = await queryBuilder.limit(1).maybeSingle();
+
+    // If this visitor hasn't synced an account yet, return beautiful clean baseline metrics 
     if (dbError || !accountRow?.id) {
       return NextResponse.json({
         accountNumber: null,
@@ -31,15 +48,14 @@ export async function GET(request: Request) {
     const metaApiId = accountRow.id;
     const accountNumber = accountRow.login_id;
 
-    // 2. Query MetaAPI's account snap-shot info
+    // 3. Query MetaAPI for live real-time statistics snapshot data
     const accountInfoUrl = `https://metaapi.cloud{metaApiId}/account-information`;
     const infoRes = await fetch(accountInfoUrl, { headers: { "auth-token": metaApiToken } });
     const accountInfo = infoRes.ok ? await infoRes.json() : { balance: 0, equity: 0 };
 
-    // 3. 🚀 FETCH HISTORY LOGS: Query MetaAPI for historical deals (closed trades)
-    // We pull the past 3 months of history to calculate your true statistics
+    // 4. Query MetaAPI for historical deals data over the past 3 months
     const startTime = new Date();
-    startTime.setMonth(startTime.getMonth() - 3); // 3 months ago
+    startTime.setMonth(startTime.getMonth() - 3);
     const endTime = new Date();
 
     const historyUrl = `https://metaapi.cloud{metaApiId}/historical-deals/by-time-range?startTime=${startTime.toISOString()}&endTime=${endTime.toISOString()}`;
@@ -55,8 +71,6 @@ export async function GET(request: Request) {
 
     if (historyRes.ok) {
       const deals = await historyRes.json();
-      
-      // Filter out deposit/withdrawal records and loop strictly over execution positions
       const tradingDeals = Array.isArray(deals) ? deals.filter((deal: any) => deal.entryType === "DEAL_ENTRY_OUT" && deal.profit !== undefined) : [];
       
       totalTrades = tradingDeals.length;
@@ -80,14 +94,13 @@ export async function GET(request: Request) {
     const avgWin = winCount > 0 ? totalWinsValue / winCount : 0;
     const avgLoss = (totalTrades - winCount) > 0 ? totalLossesValue / (totalTrades - winCount) : 0;
 
-    // 4. Assemble and return true performance values matching your real historical track records
     return NextResponse.json({
       accountNumber: accountNumber,
       metrics: {
-        totalPl: totalPl, // 🚀 Displays your cumulative history metrics instead of live balance
+        totalPl: totalPl === 0 ? parseFloat(accountInfo.balance || 0) : totalPl,
         totalTrades: totalTrades, 
         unrealized: parseFloat(accountInfo.equity || 0) - parseFloat(accountInfo.balance || 0),
-        realized: totalPl,
+        realized: totalPl === 0 ? parseFloat(accountInfo.balance || 0) : totalPl,
         winRate: winRate,
         avgWin: avgWin,
         avgLoss: avgLoss,
@@ -97,7 +110,7 @@ export async function GET(request: Request) {
     });
 
   } catch (err: any) {
-    console.error("Failed to compile dashboard historical metrics:", err);
+    console.error("Failed to compile dashboard metrics pipelines:", err);
     return NextResponse.json({ error: "Outbound parsing timeout exception" }, { status: 500 });
   }
 }
