@@ -20,27 +20,45 @@ export default function MainDashboardPage() {
   const [liveBalance, setLiveBalance] = useState<number>(0);
   const [liveEquity, setLiveEquity] = useState<number>(0);
   
-  // PURE DYNAMIC: Tracks the active user's broker ID automatically out of the database session
+  // Tracks the active user's broker ID dynamically out of the database session
   const [activeLoginId, setActiveLoginId] = useState<string | null>(null);
 
   // Fetch performance data from your metrics API route handler dynamically
   const loadPortfolioData = async () => {
     try {
-      // 1. Pull core analytics dashboard summary blocks (Historical trade stats for current user)
-      const res = await fetch("/api/dashboard/metric");
+      // 🚀 MULTI-USER TOKEN EXTRACTOR: Look up active Supabase authorization session tokens
+      const supabaseAuthToken = localStorage.getItem("sb-mtkelzrcojdycowgoqjl-auth-token");
+      let jwtToken = "";
+      
+      if (supabaseAuthToken) {
+        const parsedToken = JSON.parse(supabaseAuthToken);
+        jwtToken = parsedToken?.access_token || "";
+      }
+
+      // 1. Pull core analytics dashboard summary blocks and securely attach the active session JWT token
+      const res = await fetch("/api/dashboard/metric", {
+        headers: {
+          "Authorization": `Bearer ${jwtToken}`
+        }
+      });
+      
       if (res.ok) {
         const data = await res.json();
         setDashboardData(data);
         
-        // DYNAMIC ALLOCATION: Automatically captures the active user's broker ID
+        // Automatically captures the active user's account number out of their session response
         if (data?.accountNumber) {
           setActiveLoginId(String(data.accountNumber));
         }
       }
 
-      // 2. Fetch live ticking balance parameters directly from the container bridge (Only if account is linked)
+      // 2. Fetch live ticking balance parameters directly from the container bridge (Only if account is discovered)
       if (activeLoginId) {
-        const metricsRes = await fetch(`/api/account-metrics?loginId=${activeLoginId}`);
+        const metricsRes = await fetch(`/api/account-metrics?loginId=${activeLoginId}`, {
+          headers: {
+            "Authorization": `Bearer ${jwtToken}`
+          }
+        });
         if (metricsRes.ok) {
           const metricsData = await metricsRes.json();
           if (metricsData && !metricsData.error) {
@@ -55,7 +73,6 @@ export default function MainDashboardPage() {
       setIsLoadingMetrics(false);
     }
   };
-
   // Polls the user's trading container dynamically every 5 seconds
   useEffect(() => {
     loadPortfolioData();
@@ -122,7 +139,6 @@ export default function MainDashboardPage() {
           + Connect Real Account
         </button>
       </div>
-
       {/* ==================== 1. FOUR METRICS CARDS ROW GRID ==================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
@@ -157,6 +173,7 @@ export default function MainDashboardPage() {
             </p>
           </div>
         </div>
+
         {/* REALIZED P&L CARD */}
         <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-[#1e293b] p-4 rounded-xl shadow-xs flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center text-base shrink-0">
@@ -369,6 +386,7 @@ export default function MainDashboardPage() {
           </div>
         </div>
       </div>
+
       {/* ==================== MODAL SYSTEM OVERLAY POPUP ==================== */}
       <ConnectAccountModal 
         isOpen={isModalOpen} 
