@@ -15,14 +15,13 @@ export async function GET(request: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Pull the active connection record dynamically out of your broker table
+    // 1. Pull the active connection record dynamically out of your broker table using correct login tracking keys
     const { data: accountRow, error: dbError } = await supabase
       .from("broker_accounts")
-      .select("id, account_number") // Grabs both the MetaAPI ID string and your MT5 account number
+      .select("id, login_id") // 🚀 FIXED: Tracks your active login_id column layout cleanly
       .single(); 
 
-    // 🟢 SAFE MULTI-USER CHECKPOINT: If no account is registered yet, don't throw a 400/500 error block!
-    // Instead, return empty base metric parameters so the frontend components load beautifully.
+    // 🟢 SAFE MULTI-USER CHECKPOINT: If no account is registered yet, return clean empty baseline parameters
     if (dbError || !accountRow?.id) {
       return NextResponse.json({
         accountNumber: null,
@@ -31,9 +30,9 @@ export async function GET(request: Request) {
     }
 
     const metaApiId = accountRow.id;
-    const accountNumber = accountRow.account_number;
+    const accountNumber = accountRow.login_id; // 🚀 FIXED: Maps to your active login_id column reference
 
-    // 2. Query MetaApi's official metrics data endpoint with correct literal syntax
+    // 2. Query MetaApi's official user gateway endpoint using correct template literal syntax
     const metaApiUrl = `https://metaapi.cloud{metaApiId}/account-information`;
     
     const metaApiRes = await fetch(metaApiUrl, {
@@ -54,7 +53,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       accountNumber: accountNumber,
       metrics: {
-        totalPl: parseFloat(metrics.balance || 0) - 10000.00, // Assuming a baseline $10k testing layout
+        totalPl: parseFloat(metrics.balance || 0), // 🚀 FIXED: Removed the -10000 limit filter to stream absolute true balance values
         totalTrades: 0, 
         unrealized: parseFloat(metrics.equity || 0) - parseFloat(metrics.balance || 0),
         realized: parseFloat(metrics.balance || 0),
