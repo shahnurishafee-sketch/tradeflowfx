@@ -30,9 +30,9 @@ export default function MainDashboardPage() {
         const data = await res.json();
         setDashboardData(data);
         
-        if (data?.accountNumber) {
-          setActiveLoginId(String(data.accountNumber));
-        }
+        if (data?.accountNumber || data?.metrics?.accountNumber) {
+  setActiveLoginId(String(data.accountNumber || data.metrics.accountNumber || "252250777"));
+}
       }
 
       // 2. Fetch live ticking balance parameters directly from the container bridge
