@@ -47,17 +47,18 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    // 🚀 FIXED: Maps precisely to your 'login_id' column inside your Supabase table schema
+    // 🚀 FIXED: Maps precisely to your exact Supabase database table column properties
     const { error } = await supabase
       .from("broker_accounts")
       .upsert({
         platform: platform || "MT5",
-        broker_name: formattedServer,
-        login_id: String(loginId).trim(), // 🔀 Changed to login_id
-        password: investorPassword.trim(),
+        broker_server: formattedServer, // 🔀 Changed to broker_server
+        login_id: String(loginId).trim(),
+        investor_password: investorPassword.trim(), // 🔀 Changed to investor_password
         id: localTerminalInstanceId, 
         updated_at: new Date().toISOString()
       }, { onConflict: "id" });
+
 
     if (error) {
       console.error("Supabase Matrix Update Blocked by Row Policy Rules:", error.message);
