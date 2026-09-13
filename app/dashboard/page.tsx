@@ -4,7 +4,7 @@ import ConnectAccountModal from "@/components/ConnectAccountModal";
 import { useState, useEffect } from "react";
 import { 
   FiActivity, FiPieChart, FiFolder, FiCheckCircle, FiClock, 
-  FiCalendar, FiChevronLeft, FiChevronRight, FiUser, FiArrowRight 
+  FiCalendar, FiChevronLeft, FiChevronRight, FiArrowRight 
 } from "react-icons/fi";
 
 export default function MainDashboardPage() {
@@ -12,30 +12,33 @@ export default function MainDashboardPage() {
   const [chartPeriod, setChartPeriod] = useState("1M");
   const [currentDate, setCurrentDate] = useState(new Date()); 
   
-  // DYNAMIC STATES TO LOAD LIVE DATABASE PERFORMANCE DATA
+  // DYNAMIC STATE MACHINE STORAGE FOR AUTHENTICATED USER SESSIONS
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
 
   // --- 🟢 LIVE ACCOUNT STREAM POLLING MACHINE HOOKS ---
   const [liveBalance, setLiveBalance] = useState<number>(0);
   const [liveEquity, setLiveEquity] = useState<number>(0);
+  
+  // PURE DYNAMIC: Tracks the active user's broker ID automatically out of the database session
   const [activeLoginId, setActiveLoginId] = useState<string | null>(null);
 
-  // Fetch performance data from your metrics API route handler
+  // Fetch performance data from your metrics API route handler dynamically
   const loadPortfolioData = async () => {
     try {
-      // 1. Pull core analytics dashboard summary blocks (Historical trade stats)
+      // 1. Pull core analytics dashboard summary blocks (Historical trade stats for current user)
       const res = await fetch("/api/dashboard/metric");
       if (res.ok) {
         const data = await res.json();
         setDashboardData(data);
         
-        if (data?.accountNumber || data?.metrics?.accountNumber) {
-  setActiveLoginId(String(data.accountNumber || data.metrics.accountNumber || "252250777"));
-}
+        // DYNAMIC ALLOCATION: Automatically captures the active user's broker ID
+        if (data?.accountNumber) {
+          setActiveLoginId(String(data.accountNumber));
+        }
       }
 
-      // 2. Fetch live ticking balance parameters directly from the container bridge
+      // 2. Fetch live ticking balance parameters directly from the container bridge (Only if account is linked)
       if (activeLoginId) {
         const metricsRes = await fetch(`/api/account-metrics?loginId=${activeLoginId}`);
         if (metricsRes.ok) {
@@ -53,6 +56,7 @@ export default function MainDashboardPage() {
     }
   };
 
+  // Polls the user's trading container dynamically every 5 seconds
   useEffect(() => {
     loadPortfolioData();
     const metricsPollingLoop = setInterval(loadPortfolioData, 5000);
@@ -95,6 +99,11 @@ export default function MainDashboardPage() {
     }
   };
 
+  // Safe indicator evaluations for UI rendering layout stability
+  const totalPlValue = dashboardData?.metrics?.totalPl || 0;
+  const realizedNetValue = dashboardData?.metrics?.realized || 0;
+  const unrealizedValue = liveBalance !== 0 ? (liveEquity - liveBalance) : (dashboardData?.metrics?.unrealized || 0);
+
   return (
     <div className="space-y-5 text-slate-900 dark:text-slate-100 min-h-screen pb-12 text-xs font-semibold">
       
@@ -124,8 +133,8 @@ export default function MainDashboardPage() {
           </div>
           <div className="space-y-0.5">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Total P&L</p>
-            <p className={`text-lg font-black tabular-nums ${dashboardData?.metrics?.totalPl < 0 ? "text-red-500" : "text-emerald-500"}`}>
-              {isLoadingMetrics ? "..." : `$${(dashboardData?.metrics?.totalPl || 0).toFixed(2)}`}
+            <p className={`text-lg font-black tabular-nums ${totalPlValue < 0 ? "text-red-500" : totalPlValue > 0 ? "text-emerald-500" : "text-slate-900 dark:text-white"}`}>
+              {isLoadingMetrics ? "..." : activeLoginId ? `$${totalPlValue.toFixed(2)}` : "$0.00"}
             </p>
             <p className="text-[10px] text-gray-400 font-normal">
               → {isLoadingMetrics ? "..." : dashboardData?.metrics?.totalTrades || 0} historical trades logged
@@ -140,11 +149,11 @@ export default function MainDashboardPage() {
           </div>
           <div className="space-y-0.5">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Unrealized (Floating)</p>
-            <p className={`text-lg font-black tabular-nums ${(liveEquity - liveBalance) < 0 ? "text-red-500" : "text-emerald-500"}`}>
-              {isLoadingMetrics ? "..." : `$${(liveEquity - liveBalance).toFixed(2)}`}
+            <p className={`text-lg font-black tabular-nums ${unrealizedValue < 0 ? "text-red-500" : unrealizedValue > 0 ? "text-emerald-500" : "text-slate-900 dark:text-white"}`}>
+              {isLoadingMetrics ? "..." : activeLoginId ? `$${unrealizedValue.toFixed(2)}` : "$0.00"}
             </p>
             <p className="text-[10px] text-gray-400 font-normal">
-              Active Positions: {liveEquity - liveBalance !== 0 ? "1 Running" : "0 Open"}
+              Active Positions: {!isLoadingMetrics && unrealizedValue !== 0 ? "Running" : "None Open"}
             </p>
           </div>
         </div>
@@ -155,8 +164,8 @@ export default function MainDashboardPage() {
           </div>
           <div className="space-y-0.5">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Realized Net</p>
-            <p className={`text-lg font-black tabular-nums ${dashboardData?.metrics?.realized < 0 ? "text-red-500" : "text-emerald-500"}`}>
-              {isLoadingMetrics ? "..." : `$${(dashboardData?.metrics?.realized || 0).toFixed(2)}`}
+            <p className={`text-lg font-black tabular-nums ${realizedNetValue < 0 ? "text-red-500" : realizedNetValue > 0 ? "text-emerald-500" : "text-slate-900 dark:text-white"}`}>
+              {isLoadingMetrics ? "..." : activeLoginId ? `$${realizedNetValue.toFixed(2)}` : "$0.00"}
             </p>
             <p className="text-[10px] text-gray-400 font-normal">Linked Account Metrics</p>
           </div>
@@ -189,8 +198,8 @@ export default function MainDashboardPage() {
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block flex items-center gap-1">
               <FiActivity className="text-blue-500" /> PERFORMANCE ({chartPeriod})
             </span>
-            <h2 className={`text-3xl font-black tracking-tight tabular-nums ${dashboardData?.metrics?.totalPl < 0 ? "text-red-500" : "text-emerald-500"}`}>
-              {isLoadingMetrics ? "..." : `$${(dashboardData?.metrics?.totalPl || 0).toFixed(2)}`}
+            <h2 className={`text-3xl font-black tracking-tight tabular-nums ${totalPlValue < 0 ? "text-red-500" : totalPlValue > 0 ? "text-emerald-500" : "text-slate-900 dark:text-white"}`}>
+              {isLoadingMetrics ? "..." : activeLoginId ? `$${totalPlValue.toFixed(2)}` : "$0.00"}
             </h2>
           </div>
 
@@ -217,7 +226,7 @@ export default function MainDashboardPage() {
 
           <div className="m-auto text-center space-y-1 z-10 relative">
             <p className="text-sm font-black text-gray-400 dark:text-gray-500">
-              {dashboardData?.metrics?.totalTrades > 0 ? "Historical tracking graph matching positions logs" : `No metrics indexed for ${chartPeriod} timeline`}
+              {isLoadingMetrics ? "Syncing timeline parameters..." : activeLoginId && dashboardData?.metrics?.totalTrades > 0 ? "Historical tracking performance mapping logs active" : `No metrics indexed for ${chartPeriod} timeline`}
             </p>
           </div>
 
@@ -268,10 +277,10 @@ export default function MainDashboardPage() {
             {Array.from({ length: 5 }).map((_, wIdx) => (
               <div key={wIdx} className="bg-gray-50/50 dark:bg-[#1e293b]/20 border border-gray-100 dark:border-gray-800/40 rounded-xl p-1.5 text-center flex flex-col justify-center min-h-[46px]">
                 <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">WEEKLY</p>
-                <p className={`text-[11px] font-black mt-1 leading-none ${dashboardData?.metrics?.totalPl < 0 ? "text-red-500" : "text-white"}`}>
-                  {isLoadingMetrics ? "..." : `$${((dashboardData?.metrics?.totalPl || 0) / 4).toFixed(0)}`}
+                <p className={`text-[11px] font-black mt-1 leading-none ${totalPlValue < 0 ? "text-red-500" : "text-emerald-500"}`}>
+                  {isLoadingMetrics ? "..." : activeLoginId ? `$${(totalPlValue / 4).toFixed(0)}` : "$0"}
                 </p>
-                <p className="text-[8px] text-gray-400 font-normal mt-0.5 leading-none">Traded Days: {dashboardData?.metrics?.totalTrades > 0 ? "Synced" : "0"}</p>
+                <p className="text-[8px] text-gray-400 font-normal mt-0.5 leading-none">Traded Days: {!isLoadingMetrics && activeLoginId && dashboardData?.metrics?.totalTrades > 0 ? "Synced" : "0"}</p>
               </div>
             ))}
           </div>
@@ -294,7 +303,7 @@ export default function MainDashboardPage() {
               <span className="text-base">📁</span>
             </div>
             <p className="text-xs font-semibold text-gray-400">
-              {liveEquity - liveBalance !== 0 ? "Live MT5 position running on server" : "No running open positions discovered"}
+              {!isLoadingMetrics && activeLoginId && (liveEquity - liveBalance !== 0) ? "Live MT5 position running on server" : "No running open positions discovered"}
             </p>
           </div>
 
@@ -305,7 +314,7 @@ export default function MainDashboardPage() {
           </div>
         </div>
 
-        {/* RECENT ACTIVITY LOG PANEL (🚀 FIXED: Fully loops live over history arrays length) */}
+        {/* RECENT ACTIVITY LOG PANEL */}
         <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-[#1e293b] rounded-2xl p-5 shadow-xs flex flex-col justify-between min-h-[25vh]">
           <div className="flex justify-between items-baseline">
             <h4 className="font-black text-sm text-gray-900 dark:text-white">Recent Activity</h4>
@@ -317,7 +326,7 @@ export default function MainDashboardPage() {
           <div className="flex flex-col items-center justify-center text-center my-auto space-y-2 text-gray-400">
             <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-[#1e293b] border flex items-center justify-center text-gray-400"><FiClock /></div>
             <p className="text-xs font-semibold text-gray-400">
-              {dashboardData?.metrics?.totalTrades > 0 ? `Successfully tracked ${dashboardData.metrics.totalTrades} closed broker logs` : "No recent trades found in past 3 months"}
+              {!isLoadingMetrics && activeLoginId && dashboardData?.metrics?.totalTrades > 0 ? `Successfully tracked ${dashboardData.metrics.totalTrades} closed broker logs` : "No recent trades found in past 3 months"}
             </p>
           </div>
 
@@ -337,20 +346,20 @@ export default function MainDashboardPage() {
         <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-[#1e293b] rounded-2xl p-5 shadow-xs text-center space-y-4 min-h-[14vh] flex flex-col justify-center">
           <h4 className="font-black text-sm text-gray-900 dark:text-white text-left border-b pb-2">Top Performers</h4>
           <p className="text-gray-400 font-semibold my-auto">
-            {dashboardData?.metrics?.totalTrades > 0 ? "Exness account logs parsed successfully" : "No trade performance logs parsed yet"}
+            {!isLoadingMetrics && activeLoginId && dashboardData?.metrics?.totalTrades > 0 ? "Exness account log history logs indexed successfully" : "No trade performance logs parsed yet"}
           </p>
         </div>
 
-        {/* QUICK STATS BOTTOM CARD OVERLAY MATRIX (🚀 FIXED: Fully dynamic calculation variables mapping) */}
+        {/* QUICK STATS BOTTOM CARD OVERLAY MATRIX */}
         <div className="bg-white dark:bg-[#0f172a] border border-gray-200 dark:border-[#1e293b] rounded-2xl p-5 shadow-xs space-y-4">
           <h4 className="font-black text-sm text-gray-900 dark:text-white border-b pb-2">Quick Stats</h4>
           
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-left">
             {[
-              { label: "Avg Win", value: `$${(dashboardData?.metrics?.avgWin || 0).toFixed(2)}`, style: "text-green-500" },
-              { label: "Avg Loss", value: `$${(dashboardData?.metrics?.avgLoss || 0).toFixed(2)}`, style: "text-red-500" },
-              { label: "Best Trade", value: `$${(dashboardData?.metrics?.bestTrade || 0).toFixed(2)}`, style: "text-emerald-500" },
-              { label: "Worst Trade", value: `$${(dashboardData?.metrics?.worstTrade || 0).toFixed(2)}`, style: "text-red-500" },
+              { label: "Avg Win", value: isLoadingMetrics ? "..." : activeLoginId ? `$${(dashboardData?.metrics?.avgWin || 0).toFixed(2)}` : "$0.00", style: "text-green-500" },
+              { label: "Avg Loss", value: isLoadingMetrics ? "..." : activeLoginId ? `$${(dashboardData?.metrics?.avgLoss || 0).toFixed(2)}` : "$0.00", style: "text-red-500" },
+              { label: "Best Trade", value: isLoadingMetrics ? "..." : activeLoginId ? `$${(dashboardData?.metrics?.bestTrade || 0).toFixed(2)}` : "$0.00", style: "text-emerald-500" },
+              { label: "Worst Trade", value: isLoadingMetrics ? "..." : activeLoginId ? `$${(dashboardData?.metrics?.worstTrade || 0).toFixed(2)}` : "$0.00", style: "text-red-500" },
             ].map((stat, idx) => (
               <div key={idx} className="bg-gray-50/50 dark:bg-[#1e293b]/20 border border-gray-100 dark:border-gray-800/40 p-3 rounded-xl">
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</p>
