@@ -11,7 +11,6 @@ export async function GET(request: Request) {
   if (!loginId) {
     return NextResponse.json({ error: "Missing login tracking index ID" }, { status: 400 });
   }
-
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -22,20 +21,18 @@ export async function GET(request: Request) {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // 1. Pull the active connection record out of Supabase using your exact column 'id'
+    // 1. Pull the active connection record out of Supabase
     const { data: accountRow, error: dbError } = await supabase
       .from("broker_accounts")
       .select("id")
-      .single(); // Pulls the Exness configuration row you inserted
+      .single(); 
 
     if (dbError || !accountRow?.id) {
       return NextResponse.json({ error: "No synchronized connection profile found in database" }, { status: 404 });
     }
 
     const metaApiId = accountRow.id;
-
-    // 2. Query MetaApi's official user gateway endpoint using correct template syntax
+    // 2. Query MetaApi's official user gateway endpoint using the correct literal syntax
     const metaApiUrl = `https://metaapi.cloud{metaApiId}/account-information`;
     
     const metaApiRes = await fetch(metaApiUrl, {
@@ -49,7 +46,6 @@ export async function GET(request: Request) {
     }
 
     const metrics = await metaApiRes.json();
-
     // 3. Extract the exact running numbers matching MetaTrader specifications
     return NextResponse.json({
       balance: parseFloat(metrics.balance || 0),
