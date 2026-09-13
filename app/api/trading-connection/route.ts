@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         investor_password: investorPassword.trim(),
         id: localTerminalInstanceId, // Now accurately passes a UUID item to prevent syntax crashes
         updated_at: new Date().toISOString()
-      }, { onConflict: "id" });
+      }, { onConflict: "login_id" });
 
     if (error) {
       console.error("Supabase Matrix Update Blocked by Row Policy Rules:", error.message);
