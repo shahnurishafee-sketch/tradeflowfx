@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const { data: accountRow, error: dbError } = await supabase
       .from("broker_accounts")
       .select("id")
-      .single(); // We grab the row you inserted directly
+      .single(); // Pulls the Exness configuration row you inserted
 
     if (dbError || !accountRow?.id) {
       return NextResponse.json({ error: "No synchronized connection profile found in database" }, { status: 404 });
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     const metaApiId = accountRow.id;
 
-    // 2. Query MetaApi's official URL endpoint using correct template literal syntax
+    // 2. Query MetaApi's official user gateway endpoint using correct template syntax
     const metaApiUrl = `https://metaapi.cloud{metaApiId}/account-information`;
     
     const metaApiRes = await fetch(metaApiUrl, {
