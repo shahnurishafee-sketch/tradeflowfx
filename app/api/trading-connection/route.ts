@@ -1,4 +1,3 @@
-// app/api/trading-connection/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
@@ -49,6 +48,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
     // Commit account registration rows down to your Supabase cloud broker_accounts table rows
     const { error } = await supabase
       .from("broker_accounts")
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         investor_password: investorPassword.trim(),
         id: localTerminalInstanceId, // Now accurately passes a UUID item to prevent syntax crashes
         updated_at: new Date().toISOString()
-      }, { onConflict: "login_id" });
+      }, { onConflict: "login_id" }); // 🚀 FIXED: Gracefully overwrites settings if that login_id already exists
 
     if (error) {
       console.error("Supabase Matrix Update Blocked by Row Policy Rules:", error.message);
@@ -68,6 +68,7 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
     // Success framework response formatted for standard layout ingestion rules
     return NextResponse.json({ 
       success: true, 
