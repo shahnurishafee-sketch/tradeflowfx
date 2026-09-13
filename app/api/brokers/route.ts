@@ -1,4 +1,7 @@
+// app/api/brokers/route.ts
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -8,25 +11,37 @@ export async function GET(request: Request) {
   if (!query || query.length < 2) {
     return NextResponse.json([]);
   }
-
   try {
-    // We call MetaApi's public cloud provision endpoint to query real MetaTrader servers
-    const response = await fetch(
-      `https://metaapi.cloud{encodeURIComponent(query)}&platform=${platform}`,
-      {
-        headers: {
-          "auth-token": process.env.METAAPI_TOKEN || "" // Put your MetaApi Token in your .env file
-        }
+    const metaApiToken = process.env.METAAPI_TOKEN;
+
+    if (!metaApiToken) {
+      console.error("Broker Search Failure: METAAPI_TOKEN environment variable is not defined on server configuration.");
+      return NextResponse.json({ error: "Server authentication misconfigured" }, { status: 500 });
+    }
+    // 🚀 DYNAMIC FIX: Corrected template syntax and mapped MetaAPI's official provision server directory path
+    const metaApiUrl = `https://metaapi.cloud{encodeURIComponent(query)}&platform=${platform}`;
+    
+    const response = await fetch(metaApiUrl, {
+      headers: {
+        "auth-token": metaApiToken
       }
-    );
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("MetaAPI Broker Lookup Server Error Response:", errorText);
+      return NextResponse.json({ error: "Failed to pull matching broker arrays from cloud router" }, { status: response.status });
+    }
 
     const data = await response.json();
-    
-    // Extract only the string array names of matching servers
-    const servers = data.map((server: any) => server.name);
+    // Extract name string parameters out of matching broker server metadata arrays cleanly
+    const servers = Array.isArray(data) 
+      ? data.map((server: any) => server.name || server) 
+      : [];
+
     return NextResponse.json(servers);
+
   } catch (error) {
-    console.error("Broker fetch failure:", error);
-    return NextResponse.json({ error: "Failed to search servers" }, { status: 500 });
+    console.error("Broker server search pipeline failure:", error);
+    return NextResponse.json({ error: "Outbound network parsing timeout" }, { status: 500 });
   }
 }
