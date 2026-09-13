@@ -47,15 +47,15 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    // 🚀 DYNAMIC SCHEMA FIX: Map keys exactly to your true database columns ('broker_name', 'account_number', 'password')
+    // 🚀 FIXED: Maps precisely to your 'account_id' column inside your Supabase table
     const { error } = await supabase
       .from("broker_accounts")
       .upsert({
         platform: platform || "MT5",
         broker_name: formattedServer,
-        account_number: String(loginId).trim(),
+        account_id: String(loginId).trim(), // 🔀 Changed from account_number to account_id
         password: investorPassword.trim(),
-        id: localTerminalInstanceId, // Maps to your tracking 'id' primary key column safely
+        id: localTerminalInstanceId, 
         updated_at: new Date().toISOString()
       }, { onConflict: "id" });
 
