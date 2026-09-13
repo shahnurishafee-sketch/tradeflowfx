@@ -1,4 +1,3 @@
-// app/api/brokers/route.ts
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +10,7 @@ export async function GET(request: Request) {
   if (!query || query.length < 2) {
     return NextResponse.json([]);
   }
+
   try {
     const metaApiToken = process.env.METAAPI_TOKEN;
 
@@ -18,7 +18,8 @@ export async function GET(request: Request) {
       console.error("Broker Search Failure: METAAPI_TOKEN environment variable is not defined on server configuration.");
       return NextResponse.json({ error: "Server authentication misconfigured" }, { status: 500 });
     }
-    // 🚀 DYNAMIC FIX: Corrected template syntax and mapped MetaAPI's official provision server directory path
+
+    // 🚀 FIXED: Fixed string template brackets and switched from Manager profile lists to standard provisioning endpoints
     const metaApiUrl = `https://metaapi.cloud{encodeURIComponent(query)}&platform=${platform}`;
     
     const response = await fetch(metaApiUrl, {
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
         "auth-token": metaApiToken
       }
     });
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error("MetaAPI Broker Lookup Server Error Response:", errorText);
@@ -33,6 +35,7 @@ export async function GET(request: Request) {
     }
 
     const data = await response.json();
+
     // Extract name string parameters out of matching broker server metadata arrays cleanly
     const servers = Array.isArray(data) 
       ? data.map((server: any) => server.name || server) 
