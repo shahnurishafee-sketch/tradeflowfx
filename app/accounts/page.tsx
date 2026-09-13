@@ -1,6 +1,6 @@
 "use client";
 
-import AccountsTable from "../components/AccountsTable";
+import AccountsTable from "@/components/AccountsTable";
 
 export default function AccountsPage() {
   return (
