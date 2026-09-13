@@ -23,21 +23,19 @@ export async function GET(request: Request) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Pull the active connection record and meta_api_id string out of Supabase
+    // 1. Pull the active connection record out of Supabase using your exact column 'id'
     const { data: accountRow, error: dbError } = await supabase
       .from("broker_accounts")
-      .select("meta_api_id")
-      .eq("login_id", String(loginId).trim())
-      .single();
+      .select("id")
+      .single(); // We grab the row you inserted directly
 
-    if (dbError || !accountRow?.meta_api_id) {
-      return NextResponse.json({ error: "No synchronized connection profile found for this account ID" }, { status: 404 });
+    if (dbError || !accountRow?.id) {
+      return NextResponse.json({ error: "No synchronized connection profile found in database" }, { status: 404 });
     }
 
-    const metaApiId = accountRow.meta_api_id;
+    const metaApiId = accountRow.id;
 
-    // 2. Query MetaApi's remote streaming account metadata metrics endpoint
-    // This looks directly inside the live MT5 container for true balance statistics
+    // 2. Query MetaApi's official URL endpoint using correct template literal syntax
     const metaApiUrl = `https://metaapi.cloud{metaApiId}/account-information`;
     
     const metaApiRes = await fetch(metaApiUrl, {
@@ -45,9 +43,9 @@ export async function GET(request: Request) {
     });
 
     if (!metaApiRes.ok) {
-      // If the cloud bridge container is still provisioning/syncing, fallback to baseline numbers
-      console.warn("MetaApi container terminal syncing, deploying fallback baseline parameters.");
-      return NextResponse.json({ balance: 10000.00, equity: 10000.00, openPositionsCount: 0 });
+      const errorText = await metaApiRes.text();
+      console.error("MetaAPI Connection Error Response:", errorText);
+      return NextResponse.json({ error: `MetaAPI Server Error: ${metaApiRes.statusText}` }, { status: metaApiRes.status });
     }
 
     const metrics = await metaApiRes.json();
